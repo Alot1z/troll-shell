@@ -1,149 +1,155 @@
-name: TrollShell Caching Full Build
+name: TrollShell Full Build
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-trollshell:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup cache for tools
+      - name: Setup cache key from tool versions
+        id: cache-key
+        run: |
+          echo "cache-key=$(date +%s)-$(sha256sum tool-versions.txt | cut -d ' ' -f1)" >> $GITHUB_OUTPUT
+
+      - name: Restore tool-cache
         uses: actions/cache@v3
         with:
           path: tools-cache
-          key: tools-${{ runner.os }}-${{ hashFiles('tool-versions.txt') }}
-          restore-keys: |
-            tools-${{ runner.os }}-
+          key: ${{ steps.cache-key.outputs['cache-key'] }}
 
-      - name: Ensure tools-cache exists
-        run: mkdir -p tools-cache/bin
-
-      - name: Install host dependencies
+      - name: Install host build dependencies
         run: |
           sudo apt update
-          sudo apt install -y zip unzip curl python3 python3-pip ar xz-utils build-essential
+          sudo apt install -y zip unzip curl git python3 python3-pip xz-utils ar
 
-      - name: Download dpkg tools if needed
-        if: ! (exists('tools-cache/bin/dpkg'))
+      - name: Download and prepare tools (only on cache miss)
+        if: steps.cache-key.outputs['cache-hit'] != 'true'
         run: |
-          curl -L -o tools-cache/dpkg.deb "http://ftp.de.debian.org/debian/pool/main/d/dpkg/dpkg_1.20.9_amd64.deb"
-          ar x tools-cache/dpkg.deb --output tools-cache/
-          tar -xf tools-cache/data.tar.xz -C tools-cache/
-          cp tools-cache/usr/bin/dpkg tools-cache/bin/
-          cp tools-cache/usr/bin/dpkg-deb tools-cache/bin/
+          source tool-versions.txt
+          mkdir -p tools-cache/bin
 
-      - name: Download apt-get if needed
-        if: ! (exists('tools-cache/bin/apt-get'))
-        run: |
-          curl -L -o tools-cache/apt.deb "http://ftp.de.debian.org/debian/pool/main/a/apt/apt_1.8.2.1_amd64.deb"
-          ar x tools-cache/apt.deb --output tools-cache/
-          tar -xf tools-cache/data.tar.xz -C tools-cache/
-          cp tools-cache/usr/bin/apt-get tools-cache/bin/
+          # dpkg
+          curl -sLO "http://ftp.de.debian.org/debian/pool/main/d/dpkg/dpkg_${dpkg}_amd64.deb"
+          ar x dpkg_${dpkg}_amd64.deb
+          tar -xf data.tar.xz
+          cp usr/bin/dpkg usr/bin/dpkg-deb tools-cache/bin/
 
-      - name: Download clang if needed
-        if: ! (exists('tools-cache/bin/clang'))
-        run: |
-          curl -L -o tools-cache/clang.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-16.0.0/clang+llvm-16.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-          mkdir -p tools-cache/clang
-          tar -xf tools-cache/clang.tar.xz -C tools-cache/clang
-          cp tools-cache/clang/bin/clang tools-cache/bin/
-          cp tools-cache/clang/bin/clang++ tools-cache/bin/
+          # apt-get
+          curl -sLO "http://ftp.de.debian.org/debian/pool/main/a/apt/apt_${apt-get}_amd64.deb"
+          ar x apt_${apt-get}_amd64.deb
+          tar -xf data.tar.xz
+          cp usr/bin/apt-get tools-cache/bin/
 
-      - name: Download gcc if needed
-        if: ! (exists('tools-cache/bin/gcc'))
-        run: |
-          curl -L -o tools-cache/gcc.tar.xz "https://ftp.gnu.org/gnu/gcc/gcc-12.2.0/gcc-12.2.0-x86_64-linux-gnu.tar.xz"
-          mkdir -p tools-cache/gcc
-          tar -xf tools-cache/gcc.tar.xz -C tools-cache/gcc
-          cp tools-cache/gcc/bin/gcc tools-cache/bin/
-          cp tools-cache/gcc/bin/g++ tools-cache/bin/
+          # clang
+          curl -sLO "https://github.com/llvm/llvm-project/releases/download/llvmorg-${clang}/clang+llvm-${clang}-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+          tar -xf clang+llvm-${clang}-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+          cp clang+llvm-${clang}-x86_64-linux-gnu-ubuntu-20.04/bin/clang clang++ tools-cache/bin/
 
-      - name: Download Python3 if needed
-        if: ! (exists('tools-cache/bin/python3'))
-        run: |
-          curl -L -o tools-cache/python3.tgz "https://www.python.org/ftp/python/3.10.7/Python-3.10.7.tgz"
-          mkdir -p tools-cache/python3
-          tar -xf tools-cache/python3.tgz -C tools-cache/python3
-          cp tools-cache/python3/python tools-cache/bin/python3
+          # gcc
+          curl -sLO "https://ftp.gnu.org/gnu/gcc/gcc-${gcc}/gcc-${gcc}-x86_64-linux-gnu.tar.xz"
+          tar -xf gcc-${gcc}-x86_64-linux-gnu.tar.xz
+          cp gcc-${gcc}-x86_64-linux-gnu/bin/gcc g++ tools-cache/bin/
 
-      - name: Download ldid
-        if: ! (exists('tools-cache/bin/ldid'))
-        run: |
-          curl -L -o tools-cache/bin/ldid "https://github.com/ProcursusTeam/ldid/releases/download/2.1.3/ldid"
-          chmod +x tools-cache/bin/ldid
+          # python3
+          curl -sLO "https://www.python.org/ftp/python/${python3}/Python-${python3}.tgz"
+          tar -xf Python-${python3}.tgz
+          cp Python-${python3}/python tools-cache/bin/python3
 
-      - name: Build make if needed
-        if: ! (exists('tools-cache/bin/make'))
-        run: |
-          curl -L -o tools-cache/make.tar.gz "https://ftp.gnu.org/gnu/make/make-4.3.tar.gz"
-          mkdir -p tools-cache/make && tar -xf tools-cache/make.tar.gz -C tools-cache/make
-          cd tools-cache/make/make-4.3
-          ./configure --prefix=$PWD/install
+          # ldid
+          curl -sLO "https://github.com/ProcursusTeam/ldid/releases/download/${ldid}/ldid"
+          chmod +x ldid
+          mv ldid tools-cache/bin/
+
+          # make
+          curl -sLO "https://ftp.gnu.org/gnu/make/make-${make}.tar.gz"
+          tar -xf make-${make}.tar.gz
+          cd make-${make}
+          ./configure --prefix=$(pwd)/install
           make && make install
-          cp install/bin/make ../../bin/
+          cp install/bin/make ../tools-cache/bin/
+          cd ..
 
-      - name: Build tar if needed
-        if: ! (exists('tools-cache/bin/tar'))
-        run: |
-          curl -L -o tools-cache/tar.tar.gz "https://ftp.gnu.org/gnu/tar/tar-1.34.tar.gz"
-          mkdir -p tools-cache/tar && tar -xf tools-cache/tar.tar.gz -C tools-cache/tar
-          cd tools-cache/tar/tar-1.34
-          ./configure --prefix=$PWD/install
+          # tar
+          curl -sLO "https://ftp.gnu.org/gnu/tar/tar-${tar}.tar.gz"
+          tar -xf tar-${tar}.tar.gz
+          cd tar-${tar}
+          ./configure --prefix=$(pwd)/install
           make && make install
-          cp install/bin/tar ../../bin/
+          cp install/bin/tar ../tools-cache/bin/
+          cd ..
 
-      - name: Cache updated tools
+      - name: Save tool-cache
+        if: steps.cache-key.outputs['cache-hit'] != 'true'
         uses: actions/cache@v3
         with:
           path: tools-cache
-          key: tools-${{ runner.os }}-${{ hashFiles('tool-versions.txt') }}
+          key: ${{ steps.cache-key.outputs['cache-key'] }}
 
-      - name: Clone a‑Shell and prepare payload
+      - name: Install pip packages
         run: |
-          git clone https://github.com/holzschu/a-shell.git
-          mkdir -p Payload/a-Shell.app/tools/bin
-          cp tools-cache/bin/* Payload/a-Shell.app/tools/bin/
-
-      - name: Setup pip in payload
-        run: |
-          cd Payload/a-Shell.app/tools/bin
-          ./python3 -m ensurepip
-          ./python3 -m pip install --upgrade pip
-          ./python3 -m pip install beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
+          tools-cache/bin/python3 -m ensurepip
+          tools-cache/bin/python3 -m pip install --upgrade pip
+          tools-cache/bin/python3 -m pip install \
+            beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
 
       - name: Create entitlements.plist
         run: |
           cat <<EOF > entitlements.plist
-          ... (samme entitlements som før) ...
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>get-task-allow</key><true/>
+            <key>platform-application</key><true/>
+            <key>com.apple.private.security.no-sandbox</key><true/>
+            <key>com.apple.private.security.no-container</key><true/>
+            <key>com.apple.private.skip-library-validation</key><true/>
+            <key>com.apple.private.security.cs-developer</key><true/>
+            <key>com.apple.private.persona-mgmt</key><true/>
+            <key>com.apple.private.shell</key><true/>
+            <key>com.apple.private.tcc.allow-all</key><true/>
+            <key>com.apple.private.io.mount</key><true/>
+            <key>com.apple.private.mobile_installation</key><true/>
+            <key>com.apple.private.security.storage.AppDataContainers</key><true/>
+            <key>com.apple.private.installation.apple</key><true/>
+            <key>com.apple.private.mobile_container_manager</key><true/>
+            <key>com.apple.private.all_XPC</key><true/>
+          </dict></plist>
           EOF
 
-      - name: Sign all executables
+      - name: Prepare enriched IPA
         run: |
-          find Payload/a-Shell.app/tools/bin -type f -exec tools-cache/bin/ldid -S entitlements.plist {} \;
-          tools-cache/bin/ldid -S entitlements.plist Payload/a-Shell.app/a-ShellRunner
+          curl -sL "$(jq -r '.assets[] | select(.name|test("a-Shell.*\\.ipa$")) | .browser_download_url' \
+            <(curl -s https://api.github.com/repos/holzschu/a-shell/releases/latest))" -o a-shell.ipa
+          unzip -q a-shell.ipa -d original
+          mv tools-cache original/Payload/a-Shell.app/tools
+          cp original/Payload/a-Shell.app/a-ShellRunner original/Payload/a-Shell.app/a-Shell
+          for bin in original/Payload/a-Shell.app/a-Shell tools-cache/bin/*; do
+            tools-cache/bin/ldid -S entitlements.plist "$bin"
+          done
+          cd original && zip -qr ../troll-shell.ipa Payload
 
-      - name: Package IPA
-        run: |
-          zip -r troll-shell.ipa Payload
+      - name: Create tools archive
+        run: tar czvf tools.tar.gz -C original/Payload/a-Shell.app tools
 
-      - name: Upload IPA + tools folder link
-        uses: actions/upload-artifact@v4
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
         with:
-          name: trollshell
+          name: troll-shell-full
           path: |
             troll-shell.ipa
-            tools-cache
+            tools.tar.gz
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v1
         with:
+          tag_name: "trollshell-${{ github.run_number }}"
           files: |
             troll-shell.ipa
-            tools-cache/**
+            tools.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
