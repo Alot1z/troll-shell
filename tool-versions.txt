@@ -1,8 +1,8 @@
-dpkg_version=1.21.11
+dpkg_version=1.21.1
 apt_version=2.4.9
-clang_version=16.0.6
+clang_version=15.0.7
 gcc_version=12.2.0
-python_version=3.10.10
-ldid_version=v2.1.0
+python_version=3.10.9
+ldid_version=2.1.3
 make_version=4.4
 tar_version=1.34
