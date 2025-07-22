@@ -8,13 +8,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
       - name: Install host build dependencies
         run: |
           sudo apt update
-          sudo apt install -y zip unzip curl git python3 python3-pip ldid ar xz-utils build-essential
+          sudo apt install -y zip unzip curl git python3 python3-pip ldid ar xz-utils
 
       - name: Create tools dir
         run: mkdir -p a-shell/tools/bin
@@ -48,15 +45,18 @@ jobs:
           cp gcc-12.2.0-x86_64-linux-gnu/bin/gcc ./a-shell/tools/bin/
           cp gcc-12.2.0-x86_64-linux-gnu/bin/g++ ./a-shell/tools/bin/
 
-      - name: Download Python3 binaries (Warning: this is source, needs building)
-        run: echo "Warning: Python binary not included — you must build or provide a prebuilt binary."
+      - name: Download Python3 binaries
+        run: |
+          curl -LO https://www.python.org/ftp/python/3.10.7/Python-3.10.7.tgz
+          tar -xf Python-3.10.7.tgz
+          cp Python-3.10.7/python ./a-shell/tools/bin/python3
 
       - name: Setup pip for python3 and install packages
         run: |
-          cd a-shell/tools/bin || exit 1
-          python3 -m ensurepip || true
-          python3 -m pip install --upgrade pip || true
-          python3 -m pip install beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer || true
+          cd a-shell/tools/bin
+          ./python3 -m ensurepip
+          ./python3 -m pip install --upgrade pip
+          ./python3 -m pip install beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
 
       - name: Download ldid
         run: |
@@ -92,32 +92,32 @@ jobs:
       - name: Create entitlements.plist
         run: |
           cat <<EOF > entitlements.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>get-task-allow</key><true/>
-            <key>platform-application</key><true/>
-            <key>com.apple.private.security.no-sandbox</key><true/>
-            <key>com.apple.private.security.no-container</key><true/>
-            <key>com.apple.private.skip-library-validation</key><true/>
-            <key>com.apple.private.security.cs-developer</key><true/>
-            <key>com.apple.private.persona-mgmt</key><true/>
-            <key>com.apple.private.shell</key><true/>
-            <key>com.apple.private.tcc.allow-all</key><true/>
-            <key>com.apple.private.io.mount</key><true/>
-            <key>com.apple.private.mobile_installation</key><true/>
-            <key>com.apple.private.security.storage.AppDataContainers</key><true/>
-            <key>com.apple.private.installation.apple</key><true/>
-            <key>com.apple.private.mobile_container_manager</key><true/>
-            <key>com.apple.private.all_XPC</key><true/>
-          </dict>
-          </plist>
-          EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>get-task-allow</key><true/>
+  <key>platform-application</key><true/>
+  <key>com.apple.private.security.no-sandbox</key><true/>
+  <key>com.apple.private.security.no-container</key><true/>
+  <key>com.apple.private.skip-library-validation</key><true/>
+  <key>com.apple.private.security.cs-developer</key><true/>
+  <key>com.apple.private.persona-mgmt</key><true/>
+  <key>com.apple.private.shell</key><true/>
+  <key>com.apple.private.tcc.allow-all</key><true/>
+  <key>com.apple.private.io.mount</key><true/>
+  <key>com.apple.private.mobile_installation</key><true/>
+  <key>com.apple.private.security.storage.AppDataContainers</key><true/>
+  <key>com.apple.private.installation.apple</key><true/>
+  <key>com.apple.private.mobile_container_manager</key><true/>
+  <key>com.apple.private.all_XPC</key><true/>
+</dict>
+</plist>
+EOF
 
       - name: Patch tools with entitlements using ldid
         run: |
-          find a-shell/tools/bin -type f -exec a-shell/tools/bin/ldid -S entitlements.plist {} \;
+          find a-shell/tools/bin -type f -exec ./a-shell/tools/bin/ldid -S entitlements.plist {} \;
 
       - name: Prepare IPA payload
         run: |
@@ -141,12 +141,12 @@ jobs:
 
       - name: Optional release creation
         uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
         with:
           name: "TrollShell Auto Build"
           tag_name: "trollshell-${{ github.run_number }}"
           files: |
             troll-shell.ipa
             tools.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
