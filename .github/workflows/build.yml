@@ -12,180 +12,181 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Read tool versions
-      id: read_versions
-      run: |
-        echo "Reading versions from $TOOL_VERSIONS_FILE"
-        source $TOOL_VERSIONS_FILE
-        echo "dpkg_version=$dpkg_version" >> $GITHUB_OUTPUT
-        echo "apt_version=$apt_version" >> $GITHUB_OUTPUT
-        echo "clang_version=$clang_version" >> $GITHUB_OUTPUT
-        echo "gcc_version=$gcc_version" >> $GITHUB_OUTPUT
-        echo "python_version=$python_version" >> $GITHUB_OUTPUT
-        echo "ldid_version=$ldid_version" >> $GITHUB_OUTPUT
-        echo "make_version=$make_version" >> $GITHUB_OUTPUT
-        echo "tar_version=$tar_version" >> $GITHUB_OUTPUT
+      - name: Read tool versions
+        id: read_versions
+        shell: bash
+        run: |
+          echo "Reading versions from $TOOL_VERSIONS_FILE"
+          source $TOOL_VERSIONS_FILE
+          echo "dpkg_version=$dpkg_version" >> $GITHUB_OUTPUT
+          echo "apt_version=$apt_version" >> $GITHUB_OUTPUT
+          echo "clang_version=$clang_version" >> $GITHUB_OUTPUT
+          echo "gcc_version=$gcc_version" >> $GITHUB_OUTPUT
+          echo "python_version=$python_version" >> $GITHUB_OUTPUT
+          echo "ldid_version=$ldid_version" >> $GITHUB_OUTPUT
+          echo "make_version=$make_version" >> $GITHUB_OUTPUT
+          echo "tar_version=$tar_version" >> $GITHUB_OUTPUT
 
-    - name: Setup cache directory
-      run: mkdir -p $CACHE_DIR/bin
+      - name: Setup cache directory
+        run: mkdir -p $CACHE_DIR/bin
 
-    - name: Cache downloaded tools
-      uses: actions/cache@v3
-      id: cache-tools
-      with:
-        path: $CACHE_DIR
-        key: ${{ runner.os }}-tools-${{ steps.read_versions.outputs.dpkg_version }}-${{ steps.read_versions.outputs.apt_version }}-${{ steps.read_versions.outputs.clang_version }}-${{ steps.read_versions.outputs.gcc_version }}-${{ steps.read_versions.outputs.python_version }}-${{ steps.read_versions.outputs.ldid_version }}-${{ steps.read_versions.outputs.make_version }}-${{ steps.read_versions.outputs.tar_version }}
+      - name: Cache downloaded tools
+        uses: actions/cache@v3
+        id: cache-tools
+        with:
+          path: $CACHE_DIR
+          key: ${{ runner.os }}-tools-${{ steps.read_versions.outputs.dpkg_version }}-${{ steps.read_versions.outputs.apt_version }}-${{ steps.read_versions.outputs.clang_version }}-${{ steps.read_versions.outputs.gcc_version }}-${{ steps.read_versions.outputs.python_version }}-${{ steps.read_versions.outputs.ldid_version }}-${{ steps.read_versions.outputs.make_version }}-${{ steps.read_versions.outputs.tar_version }}
 
-    - name: Install host dependencies
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        sudo apt update
-        sudo apt install -y zip unzip curl git python3 python3-pip ldid ar xz-utils build-essential
+      - name: Install host dependencies
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          sudo apt update
+          sudo apt install -y zip unzip curl git python3 python3-pip ldid ar xz-utils build-essential
 
-    - name: Download and extract dpkg tools
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        curl -LO http://ftp.de.debian.org/debian/pool/main/d/dpkg/dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb
-        ar x dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb
-        tar -xf data.tar.xz
-        cp ./usr/bin/dpkg $CACHE_DIR/bin/
-        cp ./usr/bin/dpkg-deb $CACHE_DIR/bin/
-        rm -rf dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb data.tar.xz control.tar.gz debian-binary usr
+      - name: Download and extract dpkg tools
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          curl -LO http://ftp.de.debian.org/debian/pool/main/d/dpkg/dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb
+          ar x dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb
+          tar -xf data.tar.xz
+          cp ./usr/bin/dpkg $CACHE_DIR/bin/
+          cp ./usr/bin/dpkg-deb $CACHE_DIR/bin/
+          rm -rf dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb data.tar.xz control.tar.gz debian-binary usr
 
-    - name: Download and extract apt tools
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        curl -LO http://ftp.de.debian.org/debian/pool/main/a/apt/apt_${{ steps.read_versions.outputs.apt_version }}_amd64.deb
-        ar x apt_${{ steps.read_versions.outputs.apt_version }}_amd64.deb
-        tar -xf data.tar.xz
-        cp ./usr/bin/apt-get $CACHE_DIR/bin/
-        rm -rf apt_${{ steps.read_versions.outputs.apt_version }}_amd64.deb data.tar.xz control.tar.gz debian-binary usr
+      - name: Download and extract apt tools
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          curl -LO http://ftp.de.debian.org/debian/pool/main/a/apt/apt_${{ steps.read_versions.outputs.apt_version }}_amd64.deb
+          ar x apt_${{ steps.read_versions.outputs.apt_version }}_amd64.deb
+          tar -xf data.tar.xz
+          cp ./usr/bin/apt-get $CACHE_DIR/bin/
+          rm -rf apt_${{ steps.read_versions.outputs.apt_version }}_amd64.deb data.tar.xz control.tar.gz debian-binary usr
 
-    - name: Download clang binary release
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        CLANG_ARCHIVE=clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04.tar.xz
-        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ steps.read_versions.outputs.clang_version }}/$CLANG_ARCHIVE
-        tar -xf $CLANG_ARCHIVE
-        cp clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04/bin/clang $CACHE_DIR/bin/
-        cp clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04/bin/clang++ $CACHE_DIR/bin/
-        rm -rf $CLANG_ARCHIVE clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04
+      - name: Download clang binary release
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          CLANG_ARCHIVE=clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+          curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ steps.read_versions.outputs.clang_version }}/$CLANG_ARCHIVE
+          tar -xf $CLANG_ARCHIVE
+          cp clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04/bin/clang $CACHE_DIR/bin/
+          cp clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04/bin/clang++ $CACHE_DIR/bin/
+          rm -rf $CLANG_ARCHIVE clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04
 
-    - name: Download GCC binary release
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        GCC_ARCHIVE=gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu.tar.xz
-        curl -LO https://ftp.gnu.org/gnu/gcc/gcc-${{ steps.read_versions.outputs.gcc_version }}/$GCC_ARCHIVE
-        tar -xf $GCC_ARCHIVE
-        cp gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu/bin/gcc $CACHE_DIR/bin/
-        cp gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu/bin/g++ $CACHE_DIR/bin/
-        rm -rf $GCC_ARCHIVE gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu
+      - name: Download GCC binary release
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          GCC_ARCHIVE=gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu.tar.xz
+          curl -LO https://ftp.gnu.org/gnu/gcc/gcc-${{ steps.read_versions.outputs.gcc_version }}/$GCC_ARCHIVE
+          tar -xf $GCC_ARCHIVE
+          cp gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu/bin/gcc $CACHE_DIR/bin/
+          cp gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu/bin/g++ $CACHE_DIR/bin/
+          rm -rf $GCC_ARCHIVE gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu
 
-    - name: Download Python3 source and build
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        PYTHON_ARCHIVE=Python-${{ steps.read_versions.outputs.python_version }}.tgz
-        curl -LO https://www.python.org/ftp/python/${{ steps.read_versions.outputs.python_version }}/$PYTHON_ARCHIVE
-        tar -xf $PYTHON_ARCHIVE
-        cd Python-${{ steps.read_versions.outputs.python_version }}
-        ./configure --prefix=$PWD/install
-        make -j$(nproc)
-        make install
-        cp install/bin/python3 ../$CACHE_DIR/bin/python3
-        cd ..
-        rm -rf $PYTHON_ARCHIVE Python-${{ steps.read_versions.outputs.python_version }}
+      - name: Download Python3 source and build
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          PYTHON_ARCHIVE=Python-${{ steps.read_versions.outputs.python_version }}.tgz
+          curl -LO https://www.python.org/ftp/python/${{ steps.read_versions.outputs.python_version }}/$PYTHON_ARCHIVE
+          tar -xf $PYTHON_ARCHIVE
+          cd Python-${{ steps.read_versions.outputs.python_version }}
+          ./configure --prefix=$PWD/install
+          make -j$(nproc)
+          make install
+          cp install/bin/python3 ../$CACHE_DIR/bin/python3
+          cd ..
+          rm -rf $PYTHON_ARCHIVE Python-${{ steps.read_versions.outputs.python_version }}
 
-    - name: Setup pip for python3 and install packages
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        $CACHE_DIR/bin/python3 -m ensurepip
-        $CACHE_DIR/bin/python3 -m pip install --upgrade pip
-        $CACHE_DIR/bin/python3 -m pip install beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
+      - name: Setup pip for python3 and install packages
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          $CACHE_DIR/bin/python3 -m ensurepip
+          $CACHE_DIR/bin/python3 -m pip install --upgrade pip
+          $CACHE_DIR/bin/python3 -m pip install beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
 
-    - name: Download ldid
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        curl -LO https://github.com/ProcursusTeam/ldid/releases/download/${{ steps.read_versions.outputs.ldid_version }}/ldid
-        chmod +x ldid
-        mv ldid $CACHE_DIR/bin/
+      - name: Download ldid
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          curl -LO https://github.com/ProcursusTeam/ldid/releases/download/${{ steps.read_versions.outputs.ldid_version }}/ldid
+          chmod +x ldid
+          mv ldid $CACHE_DIR/bin/
 
-    - name: Download and build make
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        MAKE_ARCHIVE=make-${{ steps.read_versions.outputs.make_version }}.tar.gz
-        curl -LO https://ftp.gnu.org/gnu/make/$MAKE_ARCHIVE
-        tar -xf $MAKE_ARCHIVE
-        cd make-${{ steps.read_versions.outputs.make_version }}
-        ./configure --prefix=$PWD/install
-        make -j$(nproc)
-        make install
-        cp install/bin/make ../../$CACHE_DIR/bin/
-        cd ..
-        rm -rf $MAKE_ARCHIVE make-${{ steps.read_versions.outputs.make_version }}
+      - name: Download and build make
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          MAKE_ARCHIVE=make-${{ steps.read_versions.outputs.make_version }}.tar.gz
+          curl -LO https://ftp.gnu.org/gnu/make/$MAKE_ARCHIVE
+          tar -xf $MAKE_ARCHIVE
+          cd make-${{ steps.read_versions.outputs.make_version }}
+          ./configure --prefix=$PWD/install
+          make -j$(nproc)
+          make install
+          cp install/bin/make ../../$CACHE_DIR/bin/
+          cd ..
+          rm -rf $MAKE_ARCHIVE make-${{ steps.read_versions.outputs.make_version }}
 
-    - name: Download and build tar
-      if: steps.cache-tools.outputs.cache-hit != 'true'
-      run: |
-        TAR_ARCHIVE=tar-${{ steps.read_versions.outputs.tar_version }}.tar.gz
-        curl -LO https://ftp.gnu.org/gnu/tar/$TAR_ARCHIVE
-        tar -xf $TAR_ARCHIVE
-        cd tar-${{ steps.read_versions.outputs.tar_version }}
-        ./configure --prefix=$PWD/install
-        make -j$(nproc)
-        make install
-        cp install/bin/tar ../../$CACHE_DIR/bin/
-        cd ..
-        rm -rf $TAR_ARCHIVE tar-${{ steps.read_versions.outputs.tar_version }}
+      - name: Download and build tar
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          TAR_ARCHIVE=tar-${{ steps.read_versions.outputs.tar_version }}.tar.gz
+          curl -LO https://ftp.gnu.org/gnu/tar/$TAR_ARCHIVE
+          tar -xf $TAR_ARCHIVE
+          cd tar-${{ steps.read_versions.outputs.tar_version }}
+          ./configure --prefix=$PWD/install
+          make -j$(nproc)
+          make install
+          cp install/bin/tar ../../$CACHE_DIR/bin/
+          cd ..
+          rm -rf $TAR_ARCHIVE tar-${{ steps.read_versions.outputs.tar_version }}
 
-    - name: Set execute permissions
-      run: chmod +x $CACHE_DIR/bin/*
+      - name: Set execute permissions
+        run: chmod +x $CACHE_DIR/bin/*
 
-    - name: Prepare a-Shell app directory
-      run: |
-        mkdir -p a-shell/tools/bin
-        cp -r $CACHE_DIR/bin/* a-shell/tools/bin/
+      - name: Prepare a-Shell app directory
+        run: |
+          mkdir -p a-shell/tools/bin
+          cp -r $CACHE_DIR/bin/* a-shell/tools/bin/
 
-    - name: Download original a-Shell IPA
-      run: |
-        curl -LO https://github.com/holzschu/a-shell/releases/download/v0.99/a-shell-v0.99.ipa
+      - name: Download original a-Shell IPA
+        run: |
+          curl -LO https://github.com/holzschu/a-shell/releases/download/v0.99/a-shell-v0.99.ipa
 
-    - name: Unzip a-Shell IPA
-      run: unzip -o a-shell-v0.99.ipa -d a-shell-ipa
+      - name: Unzip a-Shell IPA
+        run: unzip -o a-shell-v0.99.ipa -d a-shell-ipa
 
-    - name: Copy tools into app bundle
-      run: cp -r a-shell/tools/* a-shell-ipa/Payload/a-shell.app/tools/
+      - name: Copy tools into app bundle
+        run: cp -r a-shell/tools/* a-shell-ipa/Payload/a-shell.app/tools/
 
-    - name: Create entitlements.plist
-      run: |
-        cat <<EOF > entitlements.plist
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>get-task-allow</key><true/>
-  <key>platform-application</key><true/>
-  <key>com.apple.private.security.no-sandbox</key><true/>
-  <key>com.apple.private.security.no-container</key><true/>
-</dict>
-</plist>
-EOF
+      - name: Create entitlements.plist
+        run: |
+          cat <<EOF > entitlements.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>get-task-allow</key><true/>
+            <key>platform-application</key><true/>
+            <key>com.apple.private.security.no-sandbox</key><true/>
+            <key>com.apple.private.security.no-container</key><true/>
+          </dict>
+          </plist>
+          EOF
 
-    - name: Sign all binaries and app
-      run: |
-        for bin in a-shell-ipa/Payload/a-shell.app/tools/bin/* a-shell-ipa/Payload/a-shell.app/a-shell; do
-          ldid -Sentitlements.plist "$bin"
-        done
+      - name: Sign all binaries and app
+        run: |
+          for bin in a-shell-ipa/Payload/a-shell.app/tools/bin/* a-shell-ipa/Payload/a-shell.app/a-shell; do
+            ldid -Sentitlements.plist "$bin"
+          done
 
-    - name: Repack IPA
-      run: |
-        cd a-shell-ipa
-        zip -r ../troll-shell.ipa *
+      - name: Repack IPA
+        run: |
+          cd a-shell-ipa
+          zip -r ../troll-shell.ipa *
 
-    - name: Upload troll-shell IPA artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: troll-shell.ipa
-        path: troll-shell.ipa
+      - name: Upload troll-shell IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: troll-shell.ipa
+          path: troll-shell.ipa
