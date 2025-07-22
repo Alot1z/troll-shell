@@ -30,7 +30,7 @@ jobs:
         echo "tar_version=$tar_version" >> $GITHUB_OUTPUT
 
     - name: Setup cache directory
-      run: mkdir -p $CACHE_DIR
+      run: mkdir -p $CACHE_DIR/bin
 
     - name: Cache downloaded tools
       uses: actions/cache@v3
@@ -51,7 +51,6 @@ jobs:
         curl -LO http://ftp.de.debian.org/debian/pool/main/d/dpkg/dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb
         ar x dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb
         tar -xf data.tar.xz
-        mkdir -p $CACHE_DIR/bin
         cp ./usr/bin/dpkg $CACHE_DIR/bin/
         cp ./usr/bin/dpkg-deb $CACHE_DIR/bin/
         rm -rf dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb data.tar.xz control.tar.gz debian-binary usr
@@ -85,22 +84,26 @@ jobs:
         cp gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu/bin/g++ $CACHE_DIR/bin/
         rm -rf $GCC_ARCHIVE gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu
 
-    - name: Download Python3 binaries
+    - name: Download Python3 source and build
       if: steps.cache-tools.outputs.cache-hit != 'true'
       run: |
         PYTHON_ARCHIVE=Python-${{ steps.read_versions.outputs.python_version }}.tgz
         curl -LO https://www.python.org/ftp/python/${{ steps.read_versions.outputs.python_version }}/$PYTHON_ARCHIVE
         tar -xf $PYTHON_ARCHIVE
-        cp Python-${{ steps.read_versions.outputs.python_version }}/python $CACHE_DIR/bin/python3
+        cd Python-${{ steps.read_versions.outputs.python_version }}
+        ./configure --prefix=$PWD/install
+        make -j$(nproc)
+        make install
+        cp install/bin/python3 ../$CACHE_DIR/bin/python3
+        cd ..
         rm -rf $PYTHON_ARCHIVE Python-${{ steps.read_versions.outputs.python_version }}
 
     - name: Setup pip for python3 and install packages
       if: steps.cache-tools.outputs.cache-hit != 'true'
       run: |
-        cd $CACHE_DIR/bin
-        ./python3 -m ensurepip
-        ./python3 -m pip install --upgrade pip
-        ./python3 -m pip install beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
+        $CACHE_DIR/bin/python3 -m ensurepip
+        $CACHE_DIR/bin/python3 -m pip install --upgrade pip
+        $CACHE_DIR/bin/python3 -m pip install beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
 
     - name: Download ldid
       if: steps.cache-tools.outputs.cache-hit != 'true'
@@ -117,7 +120,7 @@ jobs:
         tar -xf $MAKE_ARCHIVE
         cd make-${{ steps.read_versions.outputs.make_version }}
         ./configure --prefix=$PWD/install
-        make
+        make -j$(nproc)
         make install
         cp install/bin/make ../../$CACHE_DIR/bin/
         cd ..
@@ -131,7 +134,7 @@ jobs:
         tar -xf $TAR_ARCHIVE
         cd tar-${{ steps.read_versions.outputs.tar_version }}
         ./configure --prefix=$PWD/install
-        make
+        make -j$(nproc)
         make install
         cp install/bin/tar ../../$CACHE_DIR/bin/
         cd ..
