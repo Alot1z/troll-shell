@@ -1,152 +1,124 @@
-name: TrollShell Full Build
+name: Build TrollShell IPA
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-trollshell:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install host build dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y zip unzip curl git python3 python3-pip ldid ar xz-utils
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-      - name: Create tools dir
-        run: mkdir -p a-shell/tools/bin
+    - name: Install host dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y unzip zip curl git python3 python3-pip ldid ar xz-utils
 
-      - name: Download and extract dpkg tools
-        run: |
-          curl -LO http://ftp.de.debian.org/debian/pool/main/d/dpkg/dpkg_1.20.9_amd64.deb
-          ar x dpkg_1.20.9_amd64.deb
-          tar -xf data.tar.xz
-          cp ./usr/bin/dpkg ./a-shell/tools/bin/
-          cp ./usr/bin/dpkg-deb ./a-shell/tools/bin/
+    - name: Download latest a-Shell IPA
+      run: |
+        LATEST=$(curl -s https://api.github.com/repos/holzschu/a-shell/releases/latest \
+          | jq -r '.assets[] | select(.name|test("ipa$")) | .browser_download_url')
+        curl -L "$LATEST" -o a-Shell.ipa
 
-      - name: Download and extract apt tools
-        run: |
-          curl -LO http://ftp.de.debian.org/debian/pool/main/a/apt/apt_1.8.2.1_amd64.deb
-          ar x apt_1.8.2.1_amd64.deb
-          tar -xf data.tar.xz
-          cp ./usr/bin/apt-get ./a-shell/tools/bin/
+    - name: Unzip IPA payload
+      run: unzip -q a-Shell.ipa -d payload
 
-      - name: Download clang binary release
-        run: |
-          curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-16.0.0/clang+llvm-16.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz
-          tar -xf clang+llvm-16.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz
-          cp clang+llvm-16.0.0-x86_64-linux-gnu-ubuntu-20.04/bin/clang ./a-shell/tools/bin/
-          cp clang+llvm-16.0.0-x86_64-linux-gnu-ubuntu-20.04/bin/clang++ ./a-shell/tools/bin/
+    - name: Prepare tools folder
+      run: mkdir -p payload/Payload/a-Shell.app/tools/bin
 
-      - name: Download GCC binary release
-        run: |
-          curl -LO https://ftp.gnu.org/gnu/gcc/gcc-12.2.0/gcc-12.2.0-x86_64-linux-gnu.tar.xz
-          tar -xf gcc-12.2.0-x86_64-linux-gnu.tar.xz
-          cp gcc-12.2.0-x86_64-linux-gnu/bin/gcc ./a-shell/tools/bin/
-          cp gcc-12.2.0-x86_64-linux-gnu/bin/g++ ./a-shell/tools/bin/
+    - name: Download dpkg and apt tools
+      run: |
+        curl -LO http://ftp.de.debian.org/debian/pool/main/d/dpkg/dpkg_1.20.9_amd64.deb
+        ar x dpkg_1.20.9_amd64.deb
+        tar -xf data.tar.xz
+        cp usr/bin/dpkg usr/bin/dpkg-deb payload/Payload/a-Shell.app/tools/bin/
+        curl -LO http://ftp.de.debian.org/debian/pool/main/a/apt/apt_1.8.2.1_amd64.deb
+        ar x apt_1.8.2.1_amd64.deb
+        tar -xf data.tar.xz
+        cp usr/bin/apt-get payload/Payload/a-Shell.app/tools/bin/
 
-      - name: Download Python3 binaries
-        run: |
-          curl -LO https://www.python.org/ftp/python/3.10.7/Python-3.10.7.tgz
-          tar -xf Python-3.10.7.tgz
-          cp Python-3.10.7/python ./a-shell/tools/bin/python3
+    - name: Download compilers & python
+      run: |
+        # Clang & gcc binaries
+        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-16.0.0/clang+llvm-16.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        tar -xf *.tar.xz
+        cp clang+llvm-*/bin/clang clang+llvm-*/bin/clang++ payload/Payload/a-Shell.app/tools/bin/
+        curl -LO https://ftp.gnu.org/gnu/gcc/gcc-12.2.0/gcc-12.2.0-x86_64-linux-gnu.tar.xz
+        tar -xf *.tar.xz
+        cp gcc-12.2.0-*/bin/gcc gcc-12.2.0-*/bin/g++ payload/Payload/a-Shell.app/tools/bin/
+        # Python
+        curl -LO https://www.python.org/ftp/python/3.10.7/Python-3.10.7.tgz
+        tar -xf *.tgz
+        cp Python-3.10.7/python payload/Payload/a-Shell.app/tools/bin/python3
 
-      - name: Setup pip for python3 and install packages
-        run: |
-          cd a-shell/tools/bin
-          ./python3 -m ensurepip
-          ./python3 -m pip install --upgrade pip
-          ./python3 -m pip install beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
+    - name: Install pip-packages
+      run: |
+        cd payload/Payload/a-Shell.app/tools/bin
+        ./python3 -m ensurepip
+        ./python3 -m pip install \
+          beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
 
-      - name: Download ldid
-        run: |
-          curl -LO https://github.com/ProcursusTeam/ldid/releases/download/2.1.3/ldid
-          chmod +x ldid
-          mv ldid ./a-shell/tools/bin/
+    - name: Download ldid
+      run: |
+        curl -LO https://github.com/ProcursusTeam/ldid/releases/download/2.1.3/ldid
+        chmod +x ldid
+        mv ldid payload/Payload/a-Shell.app/tools/bin/
 
-      - name: Download and build make (simple)
-        run: |
-          curl -LO https://ftp.gnu.org/gnu/make/make-4.3.tar.gz
-          tar -xf make-4.3.tar.gz
-          cd make-4.3
-          ./configure --prefix=$PWD/install
-          make
-          make install
-          cp install/bin/make ../../a-shell/tools/bin/
-          cd ..
+    - name: Build make & tar
+      run: |
+        curl -LO https://ftp.gnu.org/gnu/make/make-4.3.tar.gz
+        tar -xf *.tar.gz
+        cd make-4.3 && ./configure --prefix=$PWD/install && make && make install
+        cp install/bin/make ../../Payload/a-Shell.app/tools/bin/
+        cd ..
+        curl -LO https://ftp.gnu.org/gnu/tar/tar-1.34.tar.gz
+        tar -xf *.tar.gz
+        cd tar-1.34 && ./configure --prefix=$PWD/install && make && make install
+        cp install/bin/tar ../../Payload/a-Shell.app/tools/bin/
 
-      - name: Download and build tar (simple)
-        run: |
-          curl -LO https://ftp.gnu.org/gnu/tar/tar-1.34.tar.gz
-          tar -xf tar-1.34.tar.gz
-          cd tar-1.34
-          ./configure --prefix=$PWD/install
-          make
-          make install
-          cp install/bin/tar ../../a-shell/tools/bin/
-          cd ..
+    - name: Set executable perms
+      run: chmod +x payload/Payload/a-Shell.app/tools/bin/*
 
-      - name: Set permissions for tools
-        run: chmod +x a-shell/tools/bin/*
+    - name: Create entitlements plist
+      run: |
+        cat <<EOF > entitlements.plist
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" ...>
+        <plist version="1.0"><dict>
+          <key>get-task-allow</key><true/>
+          <key>com.apple.private.security.no-sandbox</key><true/>
+          ... add your other private keys ...
+        </dict></plist>
+        EOF
 
-      - name: Create entitlements.plist
-        run: |
-          cat <<EOF > entitlements.plist
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>get-task-allow</key><true/>
-  <key>platform-application</key><true/>
-  <key>com.apple.private.security.no-sandbox</key><true/>
-  <key>com.apple.private.security.no-container</key><true/>
-  <key>com.apple.private.skip-library-validation</key><true/>
-  <key>com.apple.private.security.cs-developer</key><true/>
-  <key>com.apple.private.persona-mgmt</key><true/>
-  <key>com.apple.private.shell</key><true/>
-  <key>com.apple.private.tcc.allow-all</key><true/>
-  <key>com.apple.private.io.mount</key><true/>
-  <key>com.apple.private.mobile_installation</key><true/>
-  <key>com.apple.private.security.storage.AppDataContainers</key><true/>
-  <key>com.apple.private.installation.apple</key><true/>
-  <key>com.apple.private.mobile_container_manager</key><true/>
-  <key>com.apple.private.all_XPC</key><true/>
-</dict>
-</plist>
-EOF
+    - name: Sign payload binary + tools
+      run: |
+        find payload/Payload/a-Shell.app/tools/bin -type f -exec payload/Payload/a-Shell.app/tools/bin/ldid -S entitlements.plist {} \;
+        ldid -S entitlements.plist payload/Payload/a-Shell.app/a-Shell
 
-      - name: Patch tools with entitlements using ldid
-        run: |
-          find a-shell/tools/bin -type f -exec ./a-shell/tools/bin/ldid -S entitlements.plist {} \;
+    - name: Package TrollShell IPA
+      run: |
+        cd payload && zip -qr ../troll-shell.ipa Payload
 
-      - name: Prepare IPA payload
-        run: |
-          mkdir -p Payload/a-Shell.app
-          cp -r a-shell/tools Payload/a-Shell.app/
-          cp a-shell/a-ShellRunner Payload/a-Shell.app/a-Shell
-          chmod +x Payload/a-Shell.app/a-Shell
-          ./a-shell/tools/bin/ldid -S entitlements.plist Payload/a-Shell.app/a-Shell
-          zip -r troll-shell.ipa Payload
+    - name: Create tools archive
+      run: tar czvf tools.tar.gz -C payload/Payload/a-Shell.app/tools .
 
-      - name: Create tools tar.gz archive
-        run: tar czvf tools.tar.gz -C a-shell/tools .
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: trollshell
+        path: |
+          troll-shell.ipa
+          tools.tar.gz
 
-      - name: Upload IPA and tools archive
-        uses: actions/upload-artifact@v3
-        with:
-          name: troll-shell-full
-          path: |
-            troll-shell.ipa
-            tools.tar.gz
-
-      - name: Optional release creation
-        uses: softprops/action-gh-release@v1
-        with:
-          name: "TrollShell Auto Build"
-          tag_name: "trollshell-${{ github.run_number }}"
-          files: |
-            troll-shell.ipa
-            tools.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+    - name: Create GitHub release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          troll-shell.ipa
+          tools.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true
