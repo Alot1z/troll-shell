@@ -44,7 +44,7 @@ jobs:
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt update
-          sudo apt install -y zip unzip curl git python3 python3-pip ldid ar xz-utils build-essential
+          sudo apt install -y zip unzip curl git python3 python3-pip xz-utils build-essential
 
       - name: Install Python build dependencies
         if: steps.cache-tools.outputs.cache-hit != 'true'
