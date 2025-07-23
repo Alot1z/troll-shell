@@ -79,7 +79,7 @@ jobs:
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt update
-          sudo apt download apt
+          apt download apt
           ar x apt*.deb
           tar -xf data.tar.xz
           cp ./usr/bin/apt-get $CACHE_DIR/bin/
