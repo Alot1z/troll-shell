@@ -68,22 +68,28 @@ jobs:
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt update
-          sudo apt download dpkg
-          ar x dpkg*.deb
+          mkdir temp_dpkg
+          cd temp_dpkg
+          apt download dpkg
+          ar x *.deb
           tar -xf data.tar.xz
-          cp ./usr/bin/dpkg $CACHE_DIR/bin/
-          cp ./usr/bin/dpkg-deb $CACHE_DIR/bin/
-          rm -rf dpkg*.deb data.tar.xz control.tar.gz debian-binary usr
+          cp ./usr/bin/dpkg ../$CACHE_DIR/bin/
+          cp ./usr/bin/dpkg-deb ../$CACHE_DIR/bin/
+          cd ..
+          rm -rf temp_dpkg
 
       - name: Download and extract apt tools
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt update
+          mkdir temp_apt
+          cd temp_apt
           apt download apt
-          ar x apt*.deb
+          ar x *.deb
           tar -xf data.tar.xz
-          cp ./usr/bin/apt-get $CACHE_DIR/bin/
-          rm -rf apt*.deb data.tar.xz control.tar.gz debian-binary usr
+          cp ./usr/bin/apt-get ../$CACHE_DIR/bin/
+          cd ..
+          rm -rf temp_apt
 
       - name: Download clang binary release
         if: steps.cache-tools.outputs.cache-hit != 'true'
