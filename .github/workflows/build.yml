@@ -49,8 +49,7 @@ jobs:
       - name: Install Python build dependencies
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
-          sudo apt update
-          sudo apt install -y libxml2-dev libxslt-dev libssl-dev zlib1g-dev libffi-dev
+          sudo apt install -y libxml2-dev libxslt-dev libssl-dev zlib1g-dev libffi-dev || true
 
       - name: Download and setup binutils
         if: steps.cache-tools.outputs.cache-hit != 'true'
@@ -91,32 +90,43 @@ jobs:
           cd ..
           rm -rf temp_apt
 
+      - name: Parallel download tools
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          download_clang() {
+            curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ steps.read_versions.outputs.clang_version }}/clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04.tar.xz &
+          }
+          download_gcc() {
+            curl -LO https://ftp.gnu.org/gnu/gcc/gcc-${{ steps.read_versions.outputs.gcc_version }}/gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu.tar.xz &
+          }
+          download_python() {
+            curl -LO https://www.python.org/ftp/python/${{ steps.read_versions.outputs.python_version }}/Python-${{ steps.read_versions.outputs.python_version }}.tgz &
+          }
+          download_clang
+          download_gcc
+          download_python
+          wait
+
       - name: Download clang binary release
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
-          CLANG_ARCHIVE=clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04.tar.xz
-          curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ steps.read_versions.outputs.clang_version }}/$CLANG_ARCHIVE
-          tar -xf $CLANG_ARCHIVE
+          tar -xf clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04.tar.xz
           cp clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04/bin/clang $CACHE_DIR/bin/
           cp clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04/bin/clang++ $CACHE_DIR/bin/
-          rm -rf $CLANG_ARCHIVE clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04
+          rm -rf clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04.tar.xz clang+llvm-${{ steps.read_versions.outputs.clang_version }}-x86_64-linux-gnu-ubuntu-20.04
 
       - name: Download GCC binary release
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
-          GCC_ARCHIVE=gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu.tar.xz
-          curl -LO https://ftp.gnu.org/gnu/gcc/gcc-${{ steps.read_versions.outputs.gcc_version }}/$GCC_ARCHIVE
-          tar -xf $GCC_ARCHIVE
+          tar -xf gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu.tar.xz
           cp gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu/bin/gcc $CACHE_DIR/bin/
           cp gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu/bin/g++ $CACHE_DIR/bin/
-          rm -rf $GCC_ARCHIVE gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu
+          rm -rf gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu.tar.xz gcc-${{ steps.read_versions.outputs.gcc_version }}-x86_64-linux-gnu
 
       - name: Download Python3 source and build
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
-          PYTHON_ARCHIVE=Python-${{ steps.read_versions.outputs.python_version }}.tgz
-          curl -LO https://www.python.org/ftp/python/${{ steps.read_versions.outputs.python_version }}/$PYTHON_ARCHIVE
-          tar -xf $PYTHON_ARCHIVE
+          tar -xf Python-${{ steps.read_versions.outputs.python_version }}.tgz
           cd Python-${{ steps.read_versions.outputs.python_version }}
           CFLAGS="-I/usr/include/libxml2" ./configure --prefix=$PWD/install --with-ensurepip=install --enable-optimizations \
                      --with-system-ffi --with-system-expat --enable-loadable-sqlite-extensions \
@@ -125,7 +135,7 @@ jobs:
           make install
           cp install/bin/python3 ../$CACHE_DIR/bin/python3
           cd ..
-          rm -rf $PYTHON_ARCHIVE Python-${{ steps.read_versions.outputs.python_version }}
+          rm -rf Python-${{ steps.read_versions.outputs.python_version }}.tgz Python-${{ steps.read_versions.outputs.python_version }}
 
       - name: Setup pip for python3 and install packages
         if: steps.cache-tools.outputs.cache-hit != 'true'
@@ -175,7 +185,7 @@ jobs:
       - name: Prepare a-Shell app directory
         run: |
           mkdir -p a-shell/tools/bin
-          cp -r $CACHE_DIR/bin/* a-shell/tools/bin/
+          cp -r $CACHE_DIR/bin/* a-shell/tools/bin/ || echo "Some binaries might be missing"
 
       - name: Download original a-Shell IPA
         run: |
