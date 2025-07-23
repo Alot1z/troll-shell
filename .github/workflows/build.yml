@@ -46,6 +46,12 @@ jobs:
           sudo apt update
           sudo apt install -y curl git python3 python3-pip xz-utils
 
+      - name: Install Python build dependencies
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          sudo apt update
+          sudo apt install -y libxml2-dev libxslt-dev libssl-dev zlib1g-dev libffi-dev
+
       - name: Download and setup binutils
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
@@ -61,12 +67,13 @@ jobs:
       - name: Download and extract dpkg tools
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
-          curl -LO http://ftp.de.debian.org/debian/pool/main/d/dpkg/dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb
-          ar x dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb
+          sudo apt update
+          sudo apt download dpkg
+          ar x dpkg*.deb
           tar -xf data.tar.xz
           cp ./usr/bin/dpkg $CACHE_DIR/bin/
           cp ./usr/bin/dpkg-deb $CACHE_DIR/bin/
-          rm -rf dpkg_${{ steps.read_versions.outputs.dpkg_version }}_amd64.deb data.tar.xz control.tar.gz debian-binary usr
+          rm -rf dpkg*.deb data.tar.xz control.tar.gz debian-binary usr
 
       - name: Download and extract apt tools
         if: steps.cache-tools.outputs.cache-hit != 'true'
@@ -118,7 +125,7 @@ jobs:
         run: |
           $CACHE_DIR/bin/python3 -m ensurepip
           $CACHE_DIR/bin/python3 -m pip install --upgrade pip
-          $CACHE_DIR/bin/python3 -m pip install --no-cache-dir beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
+          $CACHE_DIR/bin/python3 -m pip install --no-cache-dir beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer wget
 
       - name: Download ldid directly
         if: steps.cache-tools.outputs.cache-hit != 'true'
