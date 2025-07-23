@@ -78,11 +78,12 @@ jobs:
       - name: Download and extract apt tools
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
-          curl -LO http://ftp.de.debian.org/debian/pool/main/a/apt/apt_${{ steps.read_versions.outputs.apt_version }}_amd64.deb
-          ar x apt_${{ steps.read_versions.outputs.apt_version }}_amd64.deb
+          sudo apt update
+          sudo apt download apt
+          ar x apt*.deb
           tar -xf data.tar.xz
           cp ./usr/bin/apt-get $CACHE_DIR/bin/
-          rm -rf apt_${{ steps.read_versions.outputs.apt_version }}_amd64.deb data.tar.xz control.tar.gz debian-binary usr
+          rm -rf apt*.deb data.tar.xz control.tar.gz debian-binary usr
 
       - name: Download clang binary release
         if: steps.cache-tools.outputs.cache-hit != 'true'
