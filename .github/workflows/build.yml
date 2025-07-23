@@ -85,7 +85,15 @@ jobs:
           cd temp_apt
           apt download apt
           ar x *.deb
-          tar -xf data.tar.xz
+          if [ -f data.tar.xz ]; then
+            tar -xf data.tar.xz
+          elif [ -f data.tar.gz ]; then
+            tar -xf data.tar.gz
+          else
+            echo "No data.tar.xz or data.tar.gz found"
+            ls -la
+            exit 1
+          fi
           cp ./usr/bin/apt-get ../$CACHE_DIR/bin/
           cd ..
           rm -rf temp_apt
