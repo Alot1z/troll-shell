@@ -97,10 +97,9 @@ jobs:
           curl -LO https://www.python.org/ftp/python/${{ steps.read_versions.outputs.python_version }}/$PYTHON_ARCHIVE
           tar -xf $PYTHON_ARCHIVE
           cd Python-${{ steps.read_versions.outputs.python_version }}
-          ./configure --prefix=$PWD/install --with-ensurepip=install --enable-optimizations \
+          CFLAGS="-I/usr/include/libxml2" ./configure --prefix=$PWD/install --with-ensurepip=install --enable-optimizations \
                      --with-system-ffi --with-system-expat --enable-loadable-sqlite-extensions \
-                     --enable-ipv6 --with-dbmliborder=bdb:gdbm --with-system-libmpdec \
-                     CFLAGS="-I/usr/include/libxml2"
+                     --enable-ipv6 --with-dbmliborder=bdb:gdbm --with-system-libmpdec
           make -j$(nproc)
           make install
           cp install/bin/python3 ../$CACHE_DIR/bin/python3
