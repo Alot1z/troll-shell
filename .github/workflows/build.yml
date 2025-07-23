@@ -46,6 +46,11 @@ jobs:
           sudo apt update
           sudo apt install -y zip unzip curl git python3 python3-pip ldid ar xz-utils build-essential
 
+      - name: Install Python build dependencies
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          sudo apt install -y libxml2-dev libxslt-dev libssl-dev zlib1g-dev libffi-dev
+
       - name: Download and extract dpkg tools
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
@@ -92,7 +97,10 @@ jobs:
           curl -LO https://www.python.org/ftp/python/${{ steps.read_versions.outputs.python_version }}/$PYTHON_ARCHIVE
           tar -xf $PYTHON_ARCHIVE
           cd Python-${{ steps.read_versions.outputs.python_version }}
-          ./configure --prefix=$PWD/install
+          ./configure --prefix=$PWD/install --with-ensurepip=install --enable-optimizations \
+                     --with-system-ffi --with-system-expat --enable-loadable-sqlite-extensions \
+                     --enable-ipv6 --with-dbmliborder=bdb:gdbm --with-system-libmpdec \
+                     CFLAGS="-I/usr/include/libxml2"
           make -j$(nproc)
           make install
           cp install/bin/python3 ../$CACHE_DIR/bin/python3
@@ -104,7 +112,7 @@ jobs:
         run: |
           $CACHE_DIR/bin/python3 -m ensurepip
           $CACHE_DIR/bin/python3 -m pip install --upgrade pip
-          $CACHE_DIR/bin/python3 -m pip install beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
+          $CACHE_DIR/bin/python3 -m pip install --no-cache-dir beautifulsoup4 requests tqdm lxml ebooklib readability-lxml fastapi typer
 
       - name: Download ldid
         if: steps.cache-tools.outputs.cache-hit != 'true'
