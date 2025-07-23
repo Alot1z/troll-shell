@@ -81,6 +81,7 @@ jobs:
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt update
+          sudo apt install -y zstd
           mkdir temp_apt
           cd temp_apt
           apt download apt
@@ -89,8 +90,11 @@ jobs:
             tar -xf data.tar.xz
           elif [ -f data.tar.gz ]; then
             tar -xf data.tar.gz
+          elif [ -f data.tar.zst ]; then
+            unzstd data.tar.zst
+            tar -xf data.tar
           else
-            echo "No data.tar.xz or data.tar.gz found"
+            echo "No known data archive found"
             ls -la
             exit 1
           fi
